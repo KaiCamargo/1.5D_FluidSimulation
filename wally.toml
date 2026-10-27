@@ -1,0 +1,10 @@
+[package]
+name = "kaicamargo/1dot5d-fluidsimulation"
+version = "0.1.0"
+registry = "https://github.com/UpliftGames/wally-index"
+realm = "shared"
+private = true
+
+[dependencies]
+react-roblox = "jsdotlua/react-roblox@17.2.1"
+react = "jsdotlua/react@17.2.1"

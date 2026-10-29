@@ -30,9 +30,9 @@ local applyLeftWaterLevel = false				-- Whether or not the left side will behave
 local applyRightWaterLevel = false				-- Whether or not the right side will behave like there's a column to the right with waterLevelRight height when out of bounds
 for i = 1, nColumns do							-- Set all initial heights, experiment with adding equations
     columnDict[i] = {
-        h = minimumWaterLevel + rng:NextNumber(rngLowerLimit, rngUpperLimit),	-- Equation to set all the initial heights of the columns
-		h = (25 * math.sin( ( math.pi * i ) / 10) ) + 25                        -- Overwrites previous initial height assignment
-        v = 0                                                                   -- Sets initial velocity to zero set equation to a concave up parabola to simulate a splash in the middle at the start
+        -- h = minimumWaterLevel + rng:NextNumber(rngLowerLimit, rngUpperLimit),	-- Equation to set all the initial heights of the columns
+		h = (25 * math.sin( ( math.pi * i ) / 10) ) + 25,                            -- Sinosudial equation to set initial heights
+        v = 0                                                                       -- Sets initial velocity to zero set equation to a concave up parabola to simulate a splash in the middle at the start
     }
 end
 

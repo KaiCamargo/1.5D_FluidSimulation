@@ -6,13 +6,14 @@ local ReactRoblox = require(Packages:FindFirstChild("react-roblox"))
 local handle = Instance.new("ScreenGui", Players.LocalPlayer.PlayerGui)
 local root = ReactRoblox.createRoot(handle)
 
--- Water Simulation Constants
+-- Water Simulation Constants CURRENTLY TUNED FOR WATER
 local demoScreenSize = UDim2.new(1, 0, 1, 0)    -- Size of the demonstration fream
 local nColumns = 500                            -- Number of simulated columns
 local s = demoScreenSize.X.Scale / nColumns     -- Width of each column
-local tPerStep = 5 / nColumns                   -- Time step amount
-local stepsBetweenFrames = 10                   -- Time steps between heartbeats
-local c = tPerStep / 10                         -- Wave speed
+local tPerStep = 1 / 100                   		-- Time step amount per heartbeat
+local stepsBetweenFrames = 10                   -- Calculation steps between heartbeats (1 is normal simulation speed, 10 is 10x simulation speed with no loss)
+local c = 1 / 700                          		-- Wave speed
+local damp = 0.9945 							-- Damping of velocity
 local k = math.pow(c, 2) / math.pow(s, 2)       -- Discrecitization of wave equation
 local _columnObject = {                         -- Column object scaffold
     h = 0,
@@ -20,31 +21,41 @@ local _columnObject = {                         -- Column object scaffold
 }
 local rng = Random.new()                        -- Random Number Generator for decimal numbers
 local columnDict = {}                           -- Dictionary of columns each column holds the column object
-local waterLevelLeft = 0.5                      -- Resting water level of left side of screen
-local waterLevelRight = 0.5                     -- Resting water level of right side of screen
-local rngLowerLimit = 0
-local rngUpperLimit = 0.25
-for i = 1, nColumns do
+local waterLevelLeft = 0.5                      -- Resting water level of left side of screen outside of bounds
+local waterLevelRight = 0.5                     -- Resting water level of right side of screen outside of bounds
+local minimumStartingWaterLevel = 0				-- The level all the columns will start at before any rng
+local rngLowerLimit = 0							-- Minimum random value
+local rngUpperLimit = 0							-- Set rng to 0.5 for interesting waves
+local applyLeftWaterLevel = false				-- Whether or not the left side will behave like there's a column to the left with waterLevelLeft height when out of bounds
+local applyRightWaterLevel = false				-- Whether or not the right side will behave like there's a column to the right with waterLevelRight height when out of bounds
+for i = 1, nColumns do							-- Set all initial heights, experiment with adding equations
     columnDict[i] = {
-        h = 0 + rng:NextNumber(rngLowerLimit, rngUpperLimit),
-        v = 0
+        h = minimumWaterLevel + rng:NextNumber(rngLowerLimit, rngUpperLimit),	-- Equation to set all the initial heights of the columns
+		h = (25 * math.sin( ( math.pi * i ) / 10) ) + 25                        -- Overwrites previous initial height assignment
+        v = 0                                                                   -- Sets initial velocity to zero set equation to a concave up parabola to simulate a splash in the middle at the start
     }
 end
 
 local minDomainX = 1
 local maxDomainX = nColumns
 
-local function calculate_a_i(k, i, columnDict, minDomainX, maxDomainX)
+local function calculate_a_i(k, i, columnDict, minDomainX, maxDomainX) -- Calculates the acceleration that will be added to the velocity of the columns
     if i - 1 < minDomainX then
-        return k * (waterLevelLeft + columnDict[i + 1].h - (2 * columnDict[i].h) )          -- Contribution if only right neighbor exists
+		if not applyLeftWaterLevel then
+			return k * (columnDict[i + 1].h - columnDict[i].h)								-- Contribution if only right neighbor exists and only the right neighbor is considered
+		end
+        return k * (waterLevelLeft + columnDict[i + 1].h - (2 * columnDict[i].h) )          -- Contribution if only right neighbor exists and constant water level assumed to the left
     elseif i + 1 > maxDomainX then
-        return k * (waterLevelRight + columnDict[i - 1].h - (2 * columnDict[i].h) )         -- Contribution if only left neighbor exists
+		if not applyRightWaterLevel then
+			return k * (columnDict[i - 1].h - columnDict[i].h)								-- Contribution if only left neighbor exists and only the left neighbor is considered
+		end
+        return k * (waterLevelRight + columnDict[i - 1].h - (2 * columnDict[i].h) )         -- Contribution if only left neighbor exists and constant water level assumed to the right
     else 
         return k * ( columnDict[i - 1].h + columnDict[i + 1].h - (2 * columnDict[i].h) )    -- Contribution if both neighbors exists
     end
 end
 
-local function Bar(props)
+local function Bar(props) -- The class of the columns of water
     local id = props.id
     local index = props.index
     
@@ -94,13 +105,11 @@ local function DemonstrationScreen(props)
     end
 
 	React.useEffect(function() -- Runs ONCE when created
-		print("connecting to keyboard signal")
-		local UserInputService = game:GetService("UserInputService")
 		local timer = game:GetService("RunService").Heartbeat:Connect(function()
-			props.OnHeartbeat()
+			props.OnHeartbeat()	-- Runs OnHeartbeat every physics simulation step
 		end)
 		return function()
-			print("disconnecting from keyboard signal")
+			print("disconnecting from heartbeat signal")
 			timer:Disconnect()
 		end
 	end, {}) -- empty dependency array means this effect only runs once
@@ -118,9 +127,9 @@ root:render(React.createElement(DemonstrationScreen, {
             for i = 1, nColumns do
                 local o = columnDict[i]
                 if o then
-                    o.v = o.v + (tPerStep * calculate_a_i(k, i, columnDict, minDomainX, maxDomainX))
-                    o.v = o.v * 0.995
-                    o.h = o.h + o.v
+                    o.v = o.v + (tPerStep * calculate_a_i(k, i, columnDict, minDomainX, maxDomainX)) -- Add acceleration to velocity of bars
+                    o.v = o.v * damp -- Damping of velocity
+                    o.h = o.h + o.v -- Add velocity to height of bars
                 end
             end
         end
